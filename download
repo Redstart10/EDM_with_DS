@@ -1,0 +1,154 @@
+# EDMS — Electronic Document Management System
+
+Учебный Spring Boot-проект для курсовой работы по электронному документообороту.
+
+## Стек
+
+- Java 17
+- Spring Boot 3.5.16
+- Spring Web
+- Spring Data JPA / Hibernate
+- Spring Security
+- PostgreSQL
+- JWT (JJWT)
+- RSA 2048 + SHA256withRSA
+- springdoc-openapi / Swagger UI
+- Docker Compose
+
+Spring Boot 3.5.16 требует Java 17+.
+Swagger UI: http://localhost:8080/swagger-ui.html
+
+## Запуск
+
+### 1. Запустить PostgreSQL
+
+```bash
+docker compose up -d
+```
+
+### 2. Запустить приложение
+
+```bash
+mvn spring-boot:run
+```
+
+или:
+
+```bash
+mvn clean package
+java -jar target/edms-1.0.0.jar
+```
+
+## API
+
+### Регистрация
+
+POST `/api/auth/register`
+
+```json
+{
+  "username": "ivan",
+  "password": "password123",
+  "email": "ivan@example.com"
+}
+```
+
+В ответе выдаётся JWT. При регистрации пользователю также генерируется RSA 2048 key pair.
+
+### Вход
+
+POST `/api/auth/login`
+
+```json
+{
+  "username": "ivan",
+  "password": "password123"
+}
+```
+
+### Авторизация
+
+Для защищённых запросов:
+
+```text
+Authorization: Bearer <JWT>
+```
+
+В Swagger нажмите `Authorize` и вставьте:
+
+```text
+Bearer <JWT>
+```
+
+### Создание документа
+
+POST `/api/documents`
+
+```json
+{
+  "title": "Договор поставки",
+  "content": "ООО Ромашка обязуется поставить товар..."
+}
+```
+
+При создании рассчитывается SHA-256 hash содержимого.
+
+### Отправка
+
+POST `/api/documents/{id}/send`
+
+```json
+{
+  "recipientUsername": "petr"
+}
+```
+
+### Подписание
+
+POST `/api/documents/{id}/sign`
+
+Используется приватный RSA-ключ текущего пользователя.
+
+### Проверка
+
+GET `/api/documents/{id}/verify`
+
+Результат:
+
+```json
+true
+```
+
+`false` означает, что подпись не подтверждается или содержимое изменилось.
+
+### История
+
+GET `/api/documents/{id}/history`
+
+Возвращает аудит:
+
+- CREATED
+- SENT
+- SIGNED
+
+## Схема БД
+
+```text
+users
+  ├── author ────────────────┐
+  ├── recipient ─────────────┤
+  ├── signer ────────────────┤
+  └── actor ─────────────────┤
+                             ▼
+documents ─────── digital_signatures
+     │
+     └──────────── document_history
+```
+
+## Важное замечание по безопасности
+
+Этот проект предназначен для учебной/курсовой работы. Для упрощения приватный RSA-ключ пользователя хранится в PostgreSQL в Base64.
+
+В промышленной системе приватный ключ нельзя хранить так. Следует использовать защищённое хранилище ключей/сертификатов, HSM/Keystore и нормальную PKI-инфраструктуру. JWT secret также должен храниться во внешней конфигурации/secret manager.
+
+Также для реального юридически значимого ЭДО одной самодельной RSA-подписи недостаточно: нужны сертификаты, удостоверяющий центр, политика подписи, доверенная инфраструктура и соответствие применимому законодательству.
